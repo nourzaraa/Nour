@@ -1,0 +1,123 @@
+// =============================================================================
+// PRISMA SCHEMA - SGME (Système de Gestion de Maintenance d'Équipement)
+// =============================================================================
+// This file defines the database structure for the SGME application.
+// It includes:
+// - User model with role-based access control
+// - Role enum for ADMIN, EMPLOYE, and TECHNICIEN
+// - Account and Session models for NextAuth authentication
+// - VerificationToken model for email verification
+//
+// The schema uses PostgreSQL (Supabase) as the database provider.
+// =============================================================================
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// =============================================================================
+// ROLE ENUM
+// =============================================================================
+// Defines the three user roles in the system:
+// - ADMIN: Full access to all features, can manage other users
+// - EMPLOYE: Limited access, can only view own profile
+// - TECHNICIEN: Limited access, can only view own profile
+// =============================================================================
+enum Role {
+  ADMIN
+  EMPLOYE
+  TECHNICIEN
+}
+
+// =============================================================================
+// USER MODEL
+// =============================================================================
+// Stores user information and authentication details.
+// Key fields:
+// - role: Determines user permissions (ADMIN, EMPLOYE, TECHNICIEN)
+// - mustChangePassword: Forces password change on first login
+// - isActive: Allows admin to enable/disable user accounts
+// =============================================================================
+model User {
+  id                String    @id @default(cuid())
+  firstName         String
+  lastName          String
+  email             String    @unique
+  password          String
+  phone             String
+  image             String?
+  role              Role      @default(EMPLOYE)
+  isActive          Boolean   @default(true)
+  mustChangePassword Boolean  @default(true)
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // NextAuth relations
+  accounts          Account[]
+  sessions          Session[]
+
+  @@map("users")
+}
+
+// =============================================================================
+// ACCOUNT MODEL
+// =============================================================================
+// Stores OAuth account information (e.g., Google login).
+// This is used by NextAuth to link users to their OAuth providers.
+// =============================================================================
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+  @@index([userId])
+  @@map("accounts")
+}
+
+// =============================================================================
+// SESSION MODEL
+// =============================================================================
+// Stores user session information.
+// This is used by NextAuth to manage user sessions.
+// =============================================================================
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@map("sessions")
+}
+
+// =============================================================================
+// VERIFICATION TOKEN MODEL
+// =============================================================================
+// Stores email verification tokens.
+// This is used by NextAuth for email verification flows.
+// =============================================================================
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+  @@map("verification_tokens")
+}
